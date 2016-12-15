@@ -1,30 +1,30 @@
-package raven_go_meerkats_handler
+package raven_meerkats
 
 import (
-	"strings"
-	"github.com/getsentry/raven-go"
-
-	. "github.com/Tlantic/meerkats"
 	"fmt"
+	Meerkats "github.com/Tlantic/meerkats"
+	Raven "github.com/getsentry/raven-go"
 )
 
 const (
-	FIELD_TAGS = "tags"
+	FIELD_TAGS = "Tags"
 )
 
-var levels = [...]string {
-	LEVEL_TRACE: strings.ToLower(LEVEL_TRACE.String()),
-	LEVEL_DEBUG: raven.DEBUG,
-	LEVEL_INFO: raven.INFO,
-	LEVEL_WARNING: raven.WARNING,
-	LEVEL_ERROR: raven.ERROR,
-	LEVEL_FATAL: raven.FATAL,
-	LEVEL_PANIC: strings.ToLower(LEVEL_PANIC.String()),
+var levels = [...]Raven.Severity {
+	Meerkats.LEVEL_TRACE: Raven.DEBUG,
+	Meerkats.LEVEL_DEBUG: Raven.DEBUG,
+	Meerkats.LEVEL_INFO: Raven.INFO,
+	Meerkats.LEVEL_WARNING: Raven.WARNING,
+	Meerkats.LEVEL_ERROR: Raven.ERROR,
+	Meerkats.LEVEL_FATAL: Raven.FATAL,
+	Meerkats.LEVEL_PANIC: Raven.FATAL,
 }
 
+
 type RavenHandler struct {
-	raven.Client
+	*Raven.Client
 }
+
 
 //noinspection GoUnusedExportedFunction
 func New(dsn string, tags map[string]string) (*RavenHandler, error) {
@@ -33,9 +33,9 @@ func New(dsn string, tags map[string]string) (*RavenHandler, error) {
 		tags = make(map[string]string)
 	}
 
-	tags["Meerkats"] = true
+	tags["logger"] = "meerkats"
 
-	if client, err := raven.NewClient(dsn, tags); err != nil {
+	if client, err := Raven.NewClient(dsn, tags); err != nil {
 		return nil, err
 	} else {
 		return &RavenHandler{client}, nil
@@ -43,20 +43,33 @@ func New(dsn string, tags map[string]string) (*RavenHandler, error) {
 
 }
 
-func (h *RavenHandler) HandleEntry(e Entry, done Callback) {
+
+func (h *RavenHandler) HandleEntry(e Meerkats.Entry, done Meerkats.Callback) {
 	defer done()
 
-	var tags map[string]string
-
-	p := raven.NewPacket(e.Message)
+	p := Raven.NewPacket(e.Message)
 	p.EventID = e.TraceId
-	p.Timestamp = e.Timestamp
+	p.Timestamp = Raven.Timestamp(e.Timestamp)
 	p.Level = levels[e.Level]
 
-	if value, ok := e.Fields[FIELD_TAGS].(map[string]string); ok {
-		tags = value
-		delete( e.Fields, FIELD_TAGS )
+
+
+	tags := make(map[string]string)
+	t := Meerkats.Fields{}
+	if  e.Fields[FIELD_TAGS] != nil {
+		t.Merge(e.Fields[FIELD_TAGS])
+		for key, value := range t {
+			tags[key] = fmt.Sprint(value)
+		}
+		delete(e.Fields, FIELD_TAGS)
 	}
+
+
+	for key, value := range e.Fields {
+		p.Extra[key] = value
+	}
+
+
 
 	id, ch := h.Capture(p, tags);
 	err := <- ch
