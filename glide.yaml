@@ -1,0 +1,4 @@
+package: github.com/Tlantic/raven-go-meerkats-handler
+import:
+- package: github.com/Tlantic/meerkats
+- package: github.com/getsentry/raven-go
