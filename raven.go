@@ -8,8 +8,7 @@ import (
 	"time"
 )
 
-
-var levels = [...]raven.Severity {
+var levels = [...]raven.Severity{
 	log.TRACE: raven.DEBUG,
 	log.DEBUG: raven.DEBUG,
 	log.INFO: raven.INFO,
@@ -20,13 +19,15 @@ var levels = [...]raven.Severity {
 }
 
 var _ log.Handler = (*RavenHandler)(nil)
+
 type RavenHandler struct {
 	*raven.Client
-	Level log.Level
+	Level      log.Level
 	TimeLayout string
-	mu sync.Mutex
-	tags map[string]string
-	fields map[string]interface{}
+	mu         sync.Mutex
+	sync       bool
+	tags       map[string]string
+	fields     map[string]interface{}
 }
 
 
@@ -112,7 +113,7 @@ func (h *RavenHandler) With(fields ...log.Field) {
 }
 
 func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []log.Field, meta map[string]string) {
-	if ( h.Level&level != 0 ) {
+	if ( h.Level & level != 0 ) {
 		packet := raven.NewPacket(msg)
 		packet.Level = levels[level]
 		packet.AddTags(h.Tags)
@@ -127,9 +128,11 @@ func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []lo
 		}
 
 		id, ch := h.Capture(packet, h.tags);
-		err := <- ch
-		if err != nil {
-			fmt.Errorf("%s: %s", id, err.Error())
+		if (h.sync) {
+			err := <-ch
+			if err != nil {
+				fmt.Errorf("%s: %s", id, err.Error())
+			}
 		}
 	}
 }
@@ -147,7 +150,6 @@ func (h *RavenHandler) SetLevel(level log.Level) {
 func (h *RavenHandler) GetLevel() log.Level {
 	return h.Level
 }
-
 
 func (h *RavenHandler) Clone() log.Handler {
 	clone := &RavenHandler{

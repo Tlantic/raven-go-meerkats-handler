@@ -11,3 +11,10 @@ func Client(cli *raven.Client) meerkats.HandlerReceiver {
 		h.(*RavenHandler).Client = cli
 	})
 }
+
+
+func Sync(isSync bool) meerkats.HandlerReceiver {
+	return meerkats.HandlerReceiver(func(h meerkats.Handler) {
+		h.(*RavenHandler).sync = isSync
+	})
+}
