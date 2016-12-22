@@ -8,9 +8,6 @@ import (
 	"time"
 )
 
-const (
-	FIELD_TAGS = "Tags"
-)
 
 var levels = [...]raven.Severity {
 	log.TRACE: raven.DEBUG,
@@ -57,6 +54,9 @@ func Register(options ...log.HandlerOption) log.LoggerOption {
 	})
 }
 
+func (h *RavenHandler) Apply(l log.Logger) {
+	l.Register(h)
+}
 
 func (h *RavenHandler) AddBool(key string, value bool) {
 	h.mu.Lock()
