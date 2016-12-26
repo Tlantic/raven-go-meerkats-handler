@@ -20,6 +20,15 @@ var levels = [...]raven.Severity{
 
 var _ log.Handler = (*RavenHandler)(nil)
 
+func awaitDone(eventId string, errChan <- chan error, done log.DoneCallback) {
+	err := <- errChan
+	if err != nil {
+		fmt.Errorf("%s: %s", eventId, err.Error())
+	}
+	done()
+}
+
+
 type RavenHandler struct {
 	*raven.Client
 	Level      log.Level
@@ -49,6 +58,7 @@ func New(options...log.HandlerOption) (h *RavenHandler) {
 	return h
 }
 
+//noinspection GoUnusedExportedFunction
 func Register(options ...log.HandlerOption) log.LoggerOption {
 	return log.LoggerReceiver(func(l log.Logger) {
 		l.Register(New(options...))
@@ -112,7 +122,7 @@ func (h *RavenHandler) With(fields ...log.Field) {
 	}
 }
 
-func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []log.Field, meta map[string]string) {
+func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []log.Field, meta map[string]string, done log.DoneCallback ) {
 	if ( h.Level & level != 0 ) {
 		packet := raven.NewPacket(msg)
 		packet.Level = levels[level]
@@ -129,10 +139,9 @@ func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []lo
 
 		id, ch := h.Capture(packet, h.tags);
 		if (h.sync) {
-			err := <-ch
-			if err != nil {
-				fmt.Errorf("%s: %s", id, err.Error())
-			}
+			awaitDone(id, ch, done)
+		} else {
+			go awaitDone(id, ch, done)
 		}
 	}
 }
@@ -169,5 +178,4 @@ func (h *RavenHandler) Clone() log.Handler {
 	return clone
 }
 func (h *RavenHandler) Dispose() {
-
 }

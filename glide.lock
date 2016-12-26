@@ -1,0 +1,10 @@
+hash: f21b84cb8ce860fca3c7952230c70bcbd5daccac3ed7798d296b9a15f7f8254e
+updated: 2016-12-26T09:25:02.5619542Z
+imports:
+- name: github.com/certifi/gocertifi
+  version: a61bf5eafa3aee233ec8043e9da052447e5463dd
+- name: github.com/getsentry/raven-go
+  version: 3f7439d3e74d88e21d196ba20eb61a5a958bc118
+- name: github.com/Tlantic/meerkats
+  version: 42f7b0bcdba9c5f810281825b66cf0b0c21ffdb7
+testImports: []
