@@ -1,33 +1,35 @@
 package raven_meerkats
 
 import (
+	"bytes"
+	"encoding/json"
 	"fmt"
-	log "github.com/Tlantic/meerkats"
-	"github.com/getsentry/raven-go"
 	"sync"
 	"time"
+
+	log "github.com/Tlantic/meerkats"
+	"github.com/getsentry/raven-go"
 )
 
 var levels = [...]raven.Severity{
-	log.TRACE: raven.DEBUG,
-	log.DEBUG: raven.DEBUG,
-	log.INFO: raven.INFO,
+	log.TRACE:   raven.DEBUG,
+	log.DEBUG:   raven.DEBUG,
+	log.INFO:    raven.INFO,
 	log.WARNING: raven.WARNING,
-	log.ERROR: raven.ERROR,
-	log.FATAL: raven.FATAL,
-	log.PANIC: raven.FATAL,
+	log.ERROR:   raven.ERROR,
+	log.FATAL:   raven.FATAL,
+	log.PANIC:   raven.FATAL,
 }
 
 var _ log.Handler = (*RavenHandler)(nil)
 
-func awaitDone(eventId string, errChan <- chan error, done log.DoneCallback) {
-	err := <- errChan
+func awaitDone(eventId string, errChan <-chan error, done log.DoneCallback) {
+	err := <-errChan
 	if err != nil {
 		fmt.Errorf("%s: %s", eventId, err.Error())
 	}
 	done()
 }
-
 
 type RavenHandler struct {
 	*raven.Client
@@ -39,18 +41,15 @@ type RavenHandler struct {
 	fields     map[string]interface{}
 }
 
-
-
-
 //noinspection GoUnusedExportedFunction
-func New(options...log.HandlerOption) (h *RavenHandler) {
+func New(options ...log.HandlerOption) (h *RavenHandler) {
 	h = &RavenHandler{
-		Client: raven.DefaultClient,
-		Level: log.LEVEL_ALL,
+		Client:     raven.DefaultClient,
+		Level:      log.LEVEL_ALL,
 		TimeLayout: "",
-		mu: sync.Mutex{},
-		tags: map[string]string{},
-		fields: map[string]interface{}{},
+		mu:         sync.Mutex{},
+		tags:       map[string]string{},
+		fields:     map[string]interface{}{},
 	}
 	for _, opt := range options {
 		opt.Apply(h)
@@ -114,6 +113,18 @@ func (h *RavenHandler) Add(key string, value interface{}) {
 	defer h.mu.Unlock()
 	h.fields[key] = value
 }
+func (h *RavenHandler) AddJSON(key string, value interface{}) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	m := json.RawMessage{}
+	json.NewEncoder(bytes.NewBuffer(m)).Encode(value)
+	h.fields[key] = m
+}
+func (h *RavenHandler) AddError(err error) {
+	h.mu.Lock()
+	defer h.mu.Unlock()
+	h.fields["error"] = err
+}
 func (h *RavenHandler) With(fields ...log.Field) {
 	h.mu.Lock()
 	defer h.mu.Unlock()
@@ -122,8 +133,8 @@ func (h *RavenHandler) With(fields ...log.Field) {
 	}
 }
 
-func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []log.Field, meta map[string]string, done log.DoneCallback ) {
-	if ( h.Level & level != 0 ) {
+func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []log.Field, meta map[string]string, done log.DoneCallback) {
+	if h.Level&level != 0 {
 		packet := raven.NewPacket(msg)
 		packet.Level = levels[level]
 		packet.AddTags(h.Tags)
@@ -137,8 +148,8 @@ func (h *RavenHandler) Log(t time.Time, level log.Level, msg string, fields []lo
 			packet.Extra[f.Key] = f.Get()
 		}
 
-		id, ch := h.Capture(packet, h.tags);
-		if (h.sync) {
+		id, ch := h.Capture(packet, h.tags)
+		if h.sync {
 			awaitDone(id, ch, done)
 		} else {
 			go awaitDone(id, ch, done)
@@ -162,12 +173,12 @@ func (h *RavenHandler) GetLevel() log.Level {
 
 func (h *RavenHandler) Clone() log.Handler {
 	clone := &RavenHandler{
-		Client: h.Client,
-		Level: h.Level,
+		Client:     h.Client,
+		Level:      h.Level,
 		TimeLayout: h.TimeLayout,
-		tags: map[string]string{},
-		fields: map[string]interface{}{},
-		mu: sync.Mutex{},
+		tags:       map[string]string{},
+		fields:     map[string]interface{}{},
+		mu:         sync.Mutex{},
 	}
 	for k, v := range h.tags {
 		clone.tags[k] = v

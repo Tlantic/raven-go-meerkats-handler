@@ -12,7 +12,6 @@ func Client(cli *raven.Client) meerkats.HandlerReceiver {
 	})
 }
 
-
 func Sync(isSync bool) meerkats.HandlerReceiver {
 	return meerkats.HandlerReceiver(func(h meerkats.Handler) {
 		h.(*RavenHandler).sync = isSync
